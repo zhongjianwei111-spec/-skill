@@ -1,0 +1,27 @@
+=================================================
+Agent Skills Portable Pack
+=================================================
+
+CORE SKILLS
+
+1. create-plan
+Source:
+https://github.com/composio-community/awesome-codex-skills
+
+2. grill-me
+Source:
+https://github.com/mattpocock/skills
+
+3. diagnosing-bugs
+Source:
+https://github.com/mattpocock/skills
+
+4. tdd
+Source:
+https://github.com/mattpocock/skills
+
+5. playwright
+Source:
+https://github.com/openai/skills
+Path:
+skills/.curated/playwright

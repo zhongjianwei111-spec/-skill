@@ -1,0 +1,102 @@
+{
+  "version": 1,
+
+  "agents": [
+    "codex",
+    "claude-code",
+    "cursor",
+    "gemini-cli"
+  ],
+
+  "skills": [
+    {
+      "name": "create-plan",
+      "tier": "core",
+      "category": "development",
+      "source": "composio-community/awesome-codex-skills",
+      "selector": "create-plan",
+      "enabled": true
+    },
+    {
+      "name": "grill-me",
+      "tier": "core",
+      "category": "development",
+      "source": "mattpocock/skills",
+      "selector": "grill-me",
+      "enabled": true
+    },
+    {
+      "name": "diagnosing-bugs",
+      "tier": "core",
+      "category": "development",
+      "source": "mattpocock/skills",
+      "selector": "diagnosing-bugs",
+      "enabled": true
+    },
+    {
+      "name": "tdd",
+      "tier": "core",
+      "category": "development",
+      "source": "mattpocock/skills",
+      "selector": "tdd",
+      "enabled": true
+    },
+    {
+      "name": "playwright",
+      "tier": "core",
+      "category": "browser",
+      "source": "https://github.com/openai/skills/tree/main/skills/.curated/playwright",
+      "selector": "",
+      "enabled": true
+    },
+
+    {
+      "name": "stop-slop",
+      "tier": "optional",
+      "category": "writing",
+      "source": "hardikpandya/stop-slop",
+      "selector": "stop-slop",
+      "enabled": true
+    },
+    {
+      "name": "gh-fix-ci",
+      "tier": "optional",
+      "category": "github",
+      "source": "https://github.com/openai/skills/tree/main/skills/.curated/gh-fix-ci",
+      "selector": "",
+      "enabled": true
+    },
+    {
+      "name": "gh-address-comments",
+      "tier": "optional",
+      "category": "github",
+      "source": "https://github.com/openai/skills/tree/main/skills/.curated/gh-address-comments",
+      "selector": "",
+      "enabled": true
+    },
+    {
+      "name": "last30days",
+      "tier": "optional",
+      "category": "research",
+      "source": "mvanhorn/last30days-skill",
+      "selector": "last30days",
+      "enabled": true
+    },
+    {
+      "name": "book-to-skill",
+      "tier": "optional",
+      "category": "knowledge",
+      "source": "virgiliojr94/book-to-skill",
+      "selector": "book-to-skill",
+      "enabled": true
+    },
+    {
+      "name": "cangjie-skill",
+      "tier": "optional",
+      "category": "knowledge",
+      "source": "kangarooking/cangjie-skill",
+      "selector": "cangjie-skill",
+      "enabled": true
+    }
+  ]
+}
