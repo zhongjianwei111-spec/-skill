@@ -5,10 +5,32 @@
 适用场景：
 
 - 新电脑快速恢复开发 Skill
-- Codex / Claude Code / Cursor / Gemini CLI 等 Agent 共用一套 Skill
+- Codex / Claude Code / Cursor / Gemini CLI / Antigravity CLI（agy）等 Agent 共用一套 Skill
 - 后续新增 Skill 时不再修改大量脚本
 - 区分核心 Skill 和按需 Skill
 - 定期检查和更新 Skill
+
+---
+
+## 当前支持的 Agent
+
+```text
+Codex
+Claude Code
+Cursor
+Gemini CLI
+Antigravity CLI (agy)
+```
+
+`skills.json` 中对应的 Agent ID：
+
+```text
+codex
+claude-code
+cursor
+gemini-cli
+antigravity-cli
+```
 
 ---
 
@@ -80,7 +102,7 @@ playwright
 适合：
 
 - 新电脑第一次初始化
-- 新装 Codex / Claude Code / Cursor 后恢复基础能力
+- 新装 Codex / Claude Code / Cursor / Gemini CLI / Antigravity CLI 后恢复基础能力
 - 日常开发环境快速初始化
 
 ---
@@ -114,10 +136,11 @@ FAIL  = Agent 已安装，但核心 Skill 不完整
 理想结果：
 
 ```text
-Codex           PASS
-Claude Code     PASS
-Cursor          PASS
-Gemini CLI      SKIP
+Codex               PASS
+Claude Code         PASS
+Cursor              PASS
+Gemini CLI          PASS 或 SKIP
+Antigravity CLI     PASS
 
 Core skills: 5/5
 
@@ -625,6 +648,12 @@ npx.cmd --yes --package=skills@latest skills list -g -a cursor
 npx.cmd --yes --package=skills@latest skills list -g -a gemini-cli
 ```
 
+查看 Antigravity CLI：
+
+```powershell
+npx.cmd --yes --package=skills@latest skills list -g -a antigravity-cli
+```
+
 ---
 
 # 十二、查看公共 Skill 目录
@@ -653,25 +682,45 @@ tdd
 
 ---
 
-# 十三、查看 Codex Skill 目录
+# 十三、查看各 Agent Skill 目录
+
+Codex：
 
 ```powershell
 Get-ChildItem "$HOME\.codex\skills"
 ```
 
-注意：
+Claude Code：
 
-部分 Skill 可能通过：
-
-```text
-~\.agents\skills
+```powershell
+Get-ChildItem "$HOME\.claude\skills"
 ```
 
-被兼容 Agent 共用，不一定全部复制到：
+Cursor：
 
-```text
-~\.codex\skills
+```powershell
+Get-ChildItem "$HOME\.cursor\skills"
 ```
+
+Gemini CLI：
+
+```powershell
+Get-ChildItem "$HOME\.gemini\skills"
+```
+
+Antigravity CLI：
+
+```powershell
+Get-ChildItem "$HOME\.gemini\antigravity-cli\skills"
+```
+
+公共 Skill 源：
+
+```powershell
+Get-ChildItem "$HOME\.agents\skills"
+```
+
+当前安装脚本会把 `~\.agents\skills` 作为统一来源，并在需要时为各 Agent 创建 Junction / 复制兜底，避免出现“公共目录有 Skill，但 Agent 自己看不到”的情况。
 
 ---
 
@@ -1085,6 +1134,34 @@ SKIP 是正常状态
 
 ---
 
+## 6. 公共 Skill 已存在，但 Codex / Cursor / Gemini / AGY 显示缺失
+
+如果：
+
+```text
+~\.agents\skills
+```
+
+中已经有 Skill，但 `check.ps1` 显示：
+
+```text
+Codex FAIL
+Cursor FAIL
+Gemini CLI FAIL
+Antigravity CLI FAIL
+```
+
+直接重新执行：
+
+```powershell
+.\install.ps1
+.\check.ps1
+```
+
+新版 `install.ps1` 会自动把公共 Skill 同步到各 Agent 实际读取的全局目录。
+
+---
+
 ## 6. Optional Skill 没安装
 
 正常。
@@ -1146,6 +1223,12 @@ npx.cmd --yes --package=skills@latest skills list -g
 
 # 查看 Codex Skill
 npx.cmd --yes --package=skills@latest skills list -g -a codex
+
+# 查看 Antigravity CLI Skill
+npx.cmd --yes --package=skills@latest skills list -g -a antigravity-cli
+
+# 查看 Antigravity CLI Skill 文件夹
+Get-ChildItem "$HOME\.gemini\antigravity-cli\skills"
 
 # 查看公共 Skill 文件夹
 Get-ChildItem "$HOME\.agents\skills"

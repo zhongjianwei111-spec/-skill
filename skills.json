@@ -1,13 +1,6 @@
 {
   "version": 1,
-
-  "agents": [
-    "codex",
-    "claude-code",
-    "cursor",
-    "gemini-cli"
-  ],
-
+  "agents": ["codex", "claude-code", "cursor", "antigravity-cli"],
   "skills": [
     {
       "name": "create-plan",
@@ -49,7 +42,6 @@
       "selector": "",
       "enabled": true
     },
-
     {
       "name": "stop-slop",
       "tier": "optional",

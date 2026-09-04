@@ -6,221 +6,218 @@ Write-Host " Agent Skills Environment Check"
 Write-Host "========================================"
 Write-Host ""
 
-# ============================================================
-# 基础环境
-# ============================================================
+$manifestPath = Join-Path $PSScriptRoot "skills.json"
 
-Write-Host "Node:"
-node -v
+if (-not (Test-Path $manifestPath)) {
+    Write-Host "ERROR: skills.json not found." -ForegroundColor Red
+    exit 1
+}
 
-Write-Host ""
-Write-Host "NPM:"
-npm -v
+try {
+    $config = Get-Content $manifestPath -Raw | ConvertFrom-Json
+}
+catch {
+    Write-Host "ERROR: skills.json is invalid JSON." -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    exit 1
+}
 
-Write-Host ""
-Write-Host "NPX:"
-npx --version
+$coreSkills = @($config.skills | Where-Object {
+    $_.enabled -eq $true -and $_.tier -eq "core"
+})
 
+if ($coreSkills.Count -eq 0) {
+    Write-Host "ERROR: no enabled core skills found in skills.json." `
+        -ForegroundColor Red
+    exit 1
+}
 
-# ============================================================
-# 核心 Skills
-# ============================================================
-
-$coreSkills = @(
-    "create-plan",
-    "grill-me",
-    "diagnosing-bugs",
-    "tdd",
-    "playwright"
-)
-
-$globalSkillRoot = "$HOME\.agents\skills"
-
-
-# ============================================================
-# Agent 安装检测
-# ============================================================
-
-function Test-AgentInstalled {
-
+function Get-CommandVersionText {
     param(
-        [string]$AgentId
+        [Parameter(Mandatory = $true)][string]$Command,
+        [string[]]$Args = @("--version")
     )
 
-    switch ($AgentId) {
+    $cmd = Get-Command $Command -ErrorAction SilentlyContinue
 
-        "codex" {
+    if ($null -eq $cmd) {
+        return "NOT FOUND"
+    }
 
-            # Codex CLI
-            if (Get-Command codex -ErrorAction SilentlyContinue) {
-                return $true
-            }
+    try {
+        $result = & $Command @Args 2>$null | Select-Object -First 1
 
-            # Codex 配置/数据目录
-            if (Test-Path "$HOME\.codex") {
-                return $true
-            }
-
-            return $false
+        if ($null -eq $result -or "$result".Trim() -eq "") {
+            return "FOUND"
         }
 
+        return "$result".Trim()
+    }
+    catch {
+        return "FOUND"
+    }
+}
 
-        "claude-code" {
+function Test-AgentInstalled {
+    param([Parameter(Mandatory = $true)]$Agent)
 
-            # Claude Code CLI
-            if (Get-Command claude -ErrorAction SilentlyContinue) {
-                return $true
-            }
-
-            # Claude 配置目录
-            if (Test-Path "$HOME\.claude") {
-                return $true
-            }
-
-            return $false
+    foreach ($command in @($Agent.Commands)) {
+        if ($command -and (Get-Command $command -ErrorAction SilentlyContinue)) {
+            return $true
         }
+    }
 
-
-        "cursor" {
-
-            # Cursor CLI
-            if (Get-Command cursor -ErrorAction SilentlyContinue) {
-                return $true
-            }
-
-            # Cursor 常见安装目录
-            $cursorPaths = @(
-                "$env:LOCALAPPDATA\Programs\cursor\Cursor.exe",
-                "$env:LOCALAPPDATA\Programs\Cursor\Cursor.exe",
-                "$env:LOCALAPPDATA\Cursor\Cursor.exe"
-            )
-
-            foreach ($path in $cursorPaths) {
-                if (Test-Path $path) {
-                    return $true
-                }
-            }
-
-            # Cursor 用户目录
-            if (Test-Path "$HOME\.cursor") {
-                return $true
-            }
-
-            return $false
-        }
-
-
-        "gemini-cli" {
-
-            # Gemini CLI
-            if (Get-Command gemini -ErrorAction SilentlyContinue) {
-                return $true
-            }
-
-            # Gemini CLI 配置目录
-            if (Test-Path "$HOME\.gemini") {
-                return $true
-            }
-
-            return $false
+    foreach ($path in @($Agent.DetectPaths)) {
+        if ($path -and (Test-Path $path)) {
+            return $true
         }
     }
 
     return $false
 }
 
-
-# ============================================================
-# 检查公共 Skill 是否完整
-# ============================================================
-
-function Get-MissingSkills {
+function Get-AgentSkillStatus {
+    param(
+        [Parameter(Mandatory = $true)]$Agent,
+        [Parameter(Mandatory = $true)]$Skills
+    )
 
     $missing = @()
 
-    foreach ($skill in $coreSkills) {
-
-        $skillPath = Join-Path $globalSkillRoot $skill
-
-        if (-not (Test-Path $skillPath)) {
-            $missing += $skill
-            continue
-        }
-
-        # 进一步确认 SKILL.md 存在
-        $skillFile = Join-Path $skillPath "SKILL.md"
+    foreach ($skill in $Skills) {
+        $skillFile = Join-Path $Agent.SkillRoot "$($skill.name)\SKILL.md"
 
         if (-not (Test-Path $skillFile)) {
-            $missing += $skill
+            $missing += $skill.name
         }
     }
 
-    return $missing
+    return [PSCustomObject]@{
+        Ready   = ($missing.Count -eq 0)
+        Missing = $missing
+        Count   = $Skills.Count - $missing.Count
+    }
 }
 
-
-# ============================================================
-# Agent 定义
-# ============================================================
-
-$agents = @(
-    @{
-        Name = "Codex"
-        Id   = "codex"
-    },
-    @{
-        Name = "Claude Code"
-        Id   = "claude-code"
-    },
-    @{
-        Name = "Cursor"
-        Id   = "cursor"
-    },
-    @{
-        Name = "Gemini CLI"
-        Id   = "gemini-cli"
-    }
-)
-
-
-# ============================================================
-# 显示全局 Skill
-# ============================================================
-
+Write-Host "Node:"
+Write-Host (Get-CommandVersionText -Command "node" -Args @("-v"))
 Write-Host ""
+Write-Host "NPM:"
+Write-Host (Get-CommandVersionText -Command "npm.cmd" -Args @("-v"))
+Write-Host ""
+Write-Host "NPX:"
+Write-Host (Get-CommandVersionText -Command "npx.cmd" -Args @("-v"))
+Write-Host ""
+
+# ============================================================
+# Global Skills
+# ============================================================
+
+$globalSkillRoot = Join-Path $HOME ".agents\skills"
+$globalReady = 0
+
 Write-Host "========================================"
 Write-Host " Global Skills"
 Write-Host "========================================"
 Write-Host ""
 
-if (Test-Path $globalSkillRoot) {
+foreach ($skill in $coreSkills) {
+    $skillFile = Join-Path $globalSkillRoot "$($skill.name)\SKILL.md"
 
-    foreach ($skill in $coreSkills) {
-
-        $skillPath = Join-Path $globalSkillRoot $skill
-        $skillFile = Join-Path $skillPath "SKILL.md"
-
-        if ((Test-Path $skillPath) -and (Test-Path $skillFile)) {
-            Write-Host ("  OK  {0}" -f $skill) -ForegroundColor Green
-        }
-        else {
-            Write-Host ("  MISSING  {0}" -f $skill) -ForegroundColor Red
-        }
+    if (Test-Path $skillFile) {
+        $globalReady++
+        Write-Host ("  OK  {0}" -f $skill.name) -ForegroundColor Green
     }
-
+    else {
+        Write-Host ("  MISSING  {0}" -f $skill.name) -ForegroundColor Red
+    }
 }
-else {
-
-    Write-Host "Global skills directory not found:" -ForegroundColor Red
-    Write-Host $globalSkillRoot
-}
-
-
-# ============================================================
-# Agent 检查
-# ============================================================
 
 Write-Host ""
+
+# ============================================================
+# Agent definitions
+# ============================================================
+
+$codexHome = if ($env:CODEX_HOME) {
+    $env:CODEX_HOME
+}
+else {
+    Join-Path $HOME ".codex"
+}
+
+$claudeHome = if ($env:CLAUDE_CONFIG_DIR) {
+    $env:CLAUDE_CONFIG_DIR
+}
+else {
+    Join-Path $HOME ".claude"
+}
+
+$npmGlobalRoot = $null
+
+try {
+    $npmGlobalRoot = (& npm.cmd root -g 2>$null | Select-Object -First 1)
+
+    if ($null -ne $npmGlobalRoot) {
+        $npmGlobalRoot = "$npmGlobalRoot".Trim()
+    }
+}
+catch {
+    $npmGlobalRoot = $null
+}
+
+$geminiNpmPath = $null
+
+if ($npmGlobalRoot) {
+    $geminiNpmPath = Join-Path $npmGlobalRoot "@google\gemini-cli"
+}
+
+$agentDefinitions = @{
+    "codex" = [PSCustomObject]@{
+        Id          = "codex"
+        Name        = "Codex"
+        Commands    = @("codex", "codex.exe")
+        DetectPaths = @($codexHome)
+        SkillRoot   = Join-Path $codexHome "skills"
+    }
+
+    "claude-code" = [PSCustomObject]@{
+        Id          = "claude-code"
+        Name        = "Claude Code"
+        Commands    = @("claude", "claude.cmd", "claude.exe")
+        DetectPaths = @($claudeHome)
+        SkillRoot   = Join-Path $claudeHome "skills"
+    }
+
+    "cursor" = [PSCustomObject]@{
+        Id          = "cursor"
+        Name        = "Cursor"
+        Commands    = @("cursor", "cursor.cmd", "cursor.exe")
+        DetectPaths = @((Join-Path $HOME ".cursor"))
+        SkillRoot   = Join-Path $HOME ".cursor\skills"
+    }
+
+    "gemini-cli" = [PSCustomObject]@{
+        Id          = "gemini-cli"
+        Name        = "Gemini CLI"
+        Commands    = @("gemini", "gemini.cmd", "gemini.ps1")
+        DetectPaths = @($geminiNpmPath)
+        SkillRoot   = Join-Path $HOME ".gemini\skills"
+    }
+
+    "antigravity-cli" = [PSCustomObject]@{
+        Id          = "antigravity-cli"
+        Name        = "Antigravity CLI"
+        Commands    = @("agy", "agy.exe")
+        DetectPaths = @((Join-Path $HOME ".gemini\antigravity"))
+        SkillRoot   = Join-Path $HOME ".gemini\config\skills"
+    }
+}
+
+# ============================================================
+# Agent Skill Check
+# ============================================================
+
 Write-Host "========================================"
 Write-Host " Agent Skill Check"
 Write-Host "========================================"
@@ -228,75 +225,79 @@ Write-Host ""
 
 $results = @()
 
-$hasFailure = $false
+foreach ($agentId in @($config.agents)) {
 
-foreach ($agent in $agents) {
-
-    Write-Host "Checking $($agent.Name)..." -ForegroundColor Cyan
-
-    $installed = Test-AgentInstalled $agent.Id
-
-    # --------------------------------------------------------
-    # Agent 未安装
-    # --------------------------------------------------------
-
-    if (-not $installed) {
-
-        Write-Host "$($agent.Name): SKIP (Agent not installed)" -ForegroundColor Yellow
+    if (-not $agentDefinitions.ContainsKey($agentId)) {
+        Write-Host "Checking $agentId..."
+        Write-Host "$agentId`: SKIP (no checker definition)" `
+            -ForegroundColor Yellow
+        Write-Host ""
 
         $results += [PSCustomObject]@{
-            Name   = $agent.Name
-            Status = "SKIP"
-            Detail = "Agent not installed"
+            Id      = $agentId
+            Name    = $agentId
+            Status  = "SKIP"
+            Ready   = 0
+            Total   = $coreSkills.Count
+            Missing = @()
+            Root    = ""
         }
 
-        Write-Host ""
         continue
     }
 
+    $agent = $agentDefinitions[$agentId]
 
-    # --------------------------------------------------------
-    # Agent 已安装，检查 Skill
-    # --------------------------------------------------------
+    Write-Host "Checking $($agent.Name)..."
 
-    $missingSkills = @(Get-MissingSkills)
-
-    if ($missingSkills.Count -eq 0) {
-
-        Write-Host "$($agent.Name): PASS" -ForegroundColor Green
+    if (-not (Test-AgentInstalled -Agent $agent)) {
+        Write-Host "$($agent.Name): SKIP" -ForegroundColor Yellow
+        Write-Host ""
 
         $results += [PSCustomObject]@{
-            Name   = $agent.Name
-            Status = "PASS"
-            Detail = "5/5 core skills ready"
+            Id      = $agent.Id
+            Name    = $agent.Name
+            Status  = "SKIP"
+            Ready   = 0
+            Total   = $coreSkills.Count
+            Missing = @()
+            Root    = $agent.SkillRoot
         }
 
+        continue
+    }
+
+    $status = Get-AgentSkillStatus `
+        -Agent $agent `
+        -Skills $coreSkills
+
+    if ($status.Ready) {
+        Write-Host "$($agent.Name): PASS" -ForegroundColor Green
+        $state = "PASS"
     }
     else {
-
         Write-Host "$($agent.Name): FAIL" -ForegroundColor Red
-
-        Write-Host "Missing skills:" -ForegroundColor Yellow
-
-        foreach ($skill in $missingSkills) {
-            Write-Host "  - $skill"
-        }
-
-        $results += [PSCustomObject]@{
-            Name   = $agent.Name
-            Status = "FAIL"
-            Detail = "$($missingSkills.Count) skill(s) missing"
-        }
-
-        $hasFailure = $true
+        Write-Host "  Skill root: $($agent.SkillRoot)"
+        Write-Host "  Missing   : $($status.Missing -join ', ')" `
+            -ForegroundColor Red
+        $state = "FAIL"
     }
 
     Write-Host ""
+
+    $results += [PSCustomObject]@{
+        Id      = $agent.Id
+        Name    = $agent.Name
+        Status  = $state
+        Ready   = $status.Count
+        Total   = $coreSkills.Count
+        Missing = $status.Missing
+        Root    = $agent.SkillRoot
+    }
 }
 
-
 # ============================================================
-# 汇总
+# Summary
 # ============================================================
 
 Write-Host "========================================"
@@ -306,71 +307,52 @@ Write-Host ""
 
 foreach ($result in $results) {
 
+    $detail =
+        if ($result.Status -eq "PASS") {
+            "$($result.Ready)/$($result.Total) core skills ready"
+        }
+        elseif ($result.Status -eq "FAIL") {
+            "$($result.Ready)/$($result.Total) core skills ready"
+        }
+        else {
+            "agent not installed"
+        }
+
+    $line = "{0,-19} {1,-6} {2}" -f `
+        $result.Name, `
+        $result.Status, `
+        $detail
+
     switch ($result.Status) {
-
         "PASS" {
-            Write-Host (
-                "{0,-15} {1,-6} {2}" -f `
-                $result.Name,
-                $result.Status,
-                $result.Detail
-            ) -ForegroundColor Green
+            Write-Host $line -ForegroundColor Green
         }
-
-        "SKIP" {
-            Write-Host (
-                "{0,-15} {1,-6} {2}" -f `
-                $result.Name,
-                $result.Status,
-                $result.Detail
-            ) -ForegroundColor Yellow
-        }
-
         "FAIL" {
-            Write-Host (
-                "{0,-15} {1,-6} {2}" -f `
-                $result.Name,
-                $result.Status,
-                $result.Detail
-            ) -ForegroundColor Red
+            Write-Host $line -ForegroundColor Red
+        }
+        default {
+            Write-Host $line -ForegroundColor Yellow
         }
     }
 }
-
-
-# ============================================================
-# Core Skills 汇总
-# ============================================================
 
 Write-Host ""
 Write-Host "========================================"
 Write-Host " Core Skills"
 Write-Host "========================================"
 Write-Host ""
-
-$missingGlobalSkills = @(Get-MissingSkills)
-
-$installedCount = $coreSkills.Count - $missingGlobalSkills.Count
-
-Write-Host "Core skills: $installedCount/$($coreSkills.Count)"
+Write-Host "Core skills: $globalReady/$($coreSkills.Count)"
 
 foreach ($skill in $coreSkills) {
+    $skillFile = Join-Path $globalSkillRoot "$($skill.name)\SKILL.md"
 
-    if ($missingGlobalSkills -contains $skill) {
-
-        Write-Host "  MISSING  $skill" -ForegroundColor Red
-
+    if (Test-Path $skillFile) {
+        Write-Host ("  OK       {0}" -f $skill.name) -ForegroundColor Green
     }
     else {
-
-        Write-Host "  OK       $skill" -ForegroundColor Green
+        Write-Host ("  MISSING  {0}" -f $skill.name) -ForegroundColor Red
     }
 }
-
-
-# ============================================================
-# 最终结果
-# ============================================================
 
 Write-Host ""
 Write-Host "========================================"
@@ -378,29 +360,34 @@ Write-Host " Final Result"
 Write-Host "========================================"
 Write-Host ""
 
-if ($missingGlobalSkills.Count -gt 0) {
+$agentFailures = @($results | Where-Object {
+    $_.Status -eq "FAIL"
+})
 
-    Write-Host "CORE SKILLS INCOMPLETE" -ForegroundColor Red
+$environmentReady = (
+    $globalReady -eq $coreSkills.Count -and
+    $agentFailures.Count -eq 0
+)
+
+if ($environmentReady) {
+    Write-Host "ENVIRONMENT READY" -ForegroundColor Green
     Write-Host ""
-    Write-Host "Run:"
-    Write-Host "  .\install.ps1"
+    Write-Host "All installed agents are ready."
+    Write-Host "Agents that are not installed were skipped."
+    exit 0
+}
+else {
+    Write-Host "ENVIRONMENT NOT READY" -ForegroundColor Red
+
+    if ($globalReady -ne $coreSkills.Count) {
+        Write-Host "Global core skills are incomplete." `
+            -ForegroundColor Red
+    }
+
+    if ($agentFailures.Count -gt 0) {
+        Write-Host "One or more installed agents are missing core skills." `
+            -ForegroundColor Red
+    }
 
     exit 1
 }
-
-if ($hasFailure) {
-
-    Write-Host "ENVIRONMENT HAS FAILURES" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "One or more installed agents cannot access all core skills."
-
-    exit 1
-}
-
-
-Write-Host "ENVIRONMENT READY" -ForegroundColor Green
-Write-Host ""
-Write-Host "All installed agents are ready."
-Write-Host "Agents that are not installed were skipped."
-
-exit 0
